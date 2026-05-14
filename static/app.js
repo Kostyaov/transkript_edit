@@ -3,8 +3,10 @@ const state = {
   segments: [],
   selectedId: null,
   activeId: null,
+  playingSegmentId: null,
   speakerColors: new Map(),
   dirty: false,
+  showTiming: localStorage.getItem("showTiming") !== "false",
 };
 
 const speakerPalette = [
@@ -32,6 +34,7 @@ const nodes = {
   searchInput: document.querySelector("#searchInput"),
   rateInput: document.querySelector("#rateInput"),
   rateOutput: document.querySelector("#rateOutput"),
+  timingToggle: document.querySelector("#timingToggle"),
   currentTime: document.querySelector("#currentTime"),
   projectName: document.querySelector("#projectName"),
   segmentCount: document.querySelector("#segmentCount"),
@@ -53,8 +56,13 @@ nodes.saveButton.addEventListener("click", saveProject);
 nodes.newProjectButton.addEventListener("click", resetProject);
 nodes.audioPlayer.addEventListener("timeupdate", syncActiveSegment);
 nodes.audioPlayer.addEventListener("loadedmetadata", syncActiveSegment);
+nodes.audioPlayer.addEventListener("play", updatePlaybackControls);
+nodes.audioPlayer.addEventListener("pause", clearPlayingSegment);
+nodes.audioPlayer.addEventListener("ended", clearPlayingSegment);
 nodes.searchInput.addEventListener("input", applyFilter);
 nodes.rateInput.addEventListener("input", updatePlaybackRate);
+nodes.timingToggle.checked = state.showTiming;
+nodes.timingToggle.addEventListener("change", updateTimingVisibility);
 nodes.prevSegmentButton.addEventListener("click", () => goToAdjacentSegment(-1, true));
 nodes.nextSegmentButton.addEventListener("click", () => goToAdjacentSegment(1, true));
 nodes.addSegmentButton.addEventListener("click", addSegmentAtCurrentTime);
@@ -132,6 +140,7 @@ function loadProject(project) {
   state.segments = normalizeSegments(project.segments || []);
   state.selectedId = state.segments[0]?.id ?? null;
   state.activeId = null;
+  state.playingSegmentId = null;
   state.dirty = false;
   nodes.audioPlayer.src = `/api/projects/${project.id}/audio`;
   nodes.projectName.textContent = `${project.audio_filename} / ${project.transcript_filename}`;
@@ -146,6 +155,7 @@ function resetProject() {
   state.segments = [];
   state.selectedId = null;
   state.activeId = null;
+  state.playingSegmentId = null;
   state.dirty = false;
   nodes.audioPlayer.removeAttribute("src");
   nodes.audioPlayer.load();
@@ -196,6 +206,7 @@ async function openRecentProject() {
 
 function renderSegments() {
   nodes.segmentsList.textContent = "";
+  nodes.segmentsList.classList.toggle("timing-hidden", !state.showTiming);
   const speakers = getSpeakers();
   syncSpeakerColors(speakers);
   const fragment = document.createDocumentFragment();
@@ -205,16 +216,18 @@ function renderSegments() {
     applySpeakerColor(row, segment.speaker);
     row.classList.toggle("selected", segment.id === state.selectedId);
     row.classList.toggle("active", segment.id === state.activeId);
+    row.classList.toggle("playing", isSegmentPlaying(segment.id));
     populateSpeakerSelect(row.querySelector(".speaker-input"), speakers, segment.speaker);
     row.querySelector(".start-input").value = formatTime(segment.start);
     row.querySelector(".end-input").value = formatTime(segment.end);
     row.querySelector(".segment-text").value = segment.text;
 
+    const playButton = row.querySelector(".play-segment");
+    updatePlayButton(playButton, segment.id);
     row.addEventListener("click", () => selectSegment(segment.id));
-    row.querySelector(".play-segment").addEventListener("click", (event) => {
+    playButton.addEventListener("click", (event) => {
       event.stopPropagation();
-      playFrom(segment.start);
-      selectSegment(segment.id);
+      toggleSegmentPlayback(segment);
     });
     row.querySelector(".set-start").addEventListener("click", (event) => {
       event.stopPropagation();
@@ -446,9 +459,31 @@ function splitSelectedAtCaret() {
   focusSelectedText(0);
 }
 
-function playFrom(seconds) {
+function toggleSegmentPlayback(segment) {
+  if (isSegmentPlaying(segment.id)) {
+    nodes.audioPlayer.pause();
+    clearPlayingSegment();
+    return;
+  }
+  state.playingSegmentId = segment.id;
+  state.selectedId = segment.id;
+  playFrom(segment.start, segment.id);
+}
+
+function playFrom(seconds, segmentId = null) {
   nodes.audioPlayer.currentTime = Math.max(0, seconds);
-  nodes.audioPlayer.play();
+  if (segmentId !== null) {
+    state.playingSegmentId = segmentId;
+    centerSegmentInView(segmentId);
+    updatePlaybackControls();
+  }
+  const playPromise = nodes.audioPlayer.play();
+  if (playPromise?.catch) {
+    playPromise.catch(() => {
+      clearPlayingSegment();
+      setStatus("Could not start playback.");
+    });
+  }
 }
 
 function goToAdjacentSegment(direction, shouldPlay) {
@@ -462,7 +497,7 @@ function goToAdjacentSegment(direction, shouldPlay) {
   scrollSelectedIntoView();
   focusSelectedText();
   if (shouldPlay) {
-    playFrom(segment.start);
+    playFrom(segment.start, segment.id);
   }
 }
 
@@ -471,21 +506,60 @@ function syncActiveSegment() {
   nodes.currentTime.textContent = formatTime(time);
   const active = state.segments.find((segment) => time >= segment.start && time <= segment.end);
   const activeId = active?.id ?? null;
+  if (!nodes.audioPlayer.paused) {
+    state.playingSegmentId = activeId;
+  }
   if (activeId === state.activeId) return;
   state.activeId = activeId;
   document.querySelectorAll(".segment-row").forEach((row) => {
     const isActive = Number(row.dataset.id) === activeId;
     row.classList.toggle("active", isActive);
-    if (isActive && document.activeElement?.tagName !== "TEXTAREA") {
+    if (!isActive) return;
+    if (!nodes.audioPlayer.paused) {
+      row.scrollIntoView({ block: "center" });
+    } else if (document.activeElement?.tagName !== "TEXTAREA") {
       row.scrollIntoView({ block: "nearest" });
     }
   });
+  updatePlaybackControls();
+}
+
+function clearPlayingSegment() {
+  state.playingSegmentId = null;
+  updatePlaybackControls();
+}
+
+function isSegmentPlaying(id) {
+  return !nodes.audioPlayer.paused && state.playingSegmentId === id;
+}
+
+function updatePlaybackControls() {
+  document.querySelectorAll(".segment-row").forEach((row) => {
+    const segmentId = Number(row.dataset.id);
+    row.classList.toggle("playing", isSegmentPlaying(segmentId));
+    updatePlayButton(row.querySelector(".play-segment"), segmentId);
+  });
+}
+
+function updatePlayButton(button, segmentId) {
+  if (!button) return;
+  const isPlaying = isSegmentPlaying(segmentId);
+  const label = isPlaying ? "Pause this segment" : "Play from this segment";
+  button.setAttribute("aria-label", label);
+  button.setAttribute("title", label);
+  button.setAttribute("aria-pressed", String(isPlaying));
 }
 
 function updatePlaybackRate() {
   const value = Number(nodes.rateInput.value);
   nodes.audioPlayer.playbackRate = value;
   nodes.rateOutput.textContent = `${value.toFixed(2)}x`;
+}
+
+function updateTimingVisibility() {
+  state.showTiming = nodes.timingToggle.checked;
+  localStorage.setItem("showTiming", String(state.showTiming));
+  renderSegments();
 }
 
 function applyFilter() {
@@ -525,7 +599,7 @@ function focusSelectedText(caretPosition = null) {
 
 function fitTextarea(textarea) {
   textarea.style.height = "auto";
-  textarea.style.height = `${Math.max(52, textarea.scrollHeight)}px`;
+  textarea.style.height = `${Math.max(40, textarea.scrollHeight)}px`;
 }
 
 function findSegmentIdByShape(target, fallbackIndex) {
@@ -544,6 +618,11 @@ function findSegmentIdByShape(target, fallbackIndex) {
 function scrollSelectedIntoView() {
   const row = document.querySelector(`.segment-row[data-id="${state.selectedId}"]`);
   row?.scrollIntoView({ block: "nearest" });
+}
+
+function centerSegmentInView(id) {
+  const row = document.querySelector(`.segment-row[data-id="${id}"]`);
+  row?.scrollIntoView({ block: "center" });
 }
 
 function normalizeSegments(segments) {

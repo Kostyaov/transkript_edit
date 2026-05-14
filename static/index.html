@@ -55,6 +55,13 @@
           </div>
 
           <div class="tool-block">
+            <label class="toggle-row">
+              <input id="timingToggle" type="checkbox" checked />
+              <span>Show timing</span>
+            </label>
+          </div>
+
+          <div class="tool-block">
             <span class="block-label">Current time</span>
             <div id="currentTime" class="time-readout">00:00:00,000</div>
           </div>
@@ -90,12 +97,9 @@
 
     <template id="segmentTemplate">
       <article class="segment-row">
-        <button class="play-segment" type="button" title="Play from this segment">Play</button>
+        <button class="play-segment" type="button" title="Play from this segment" aria-label="Play from this segment"></button>
         <div class="speaker-control">
-          <label>
-            <span>Speaker</span>
-            <select class="speaker-input"></select>
-          </label>
+          <select class="speaker-input" aria-label="Speaker"></select>
         </div>
         <div class="time-controls">
           <label>
@@ -109,7 +113,7 @@
           </label>
           <button class="set-end" type="button">Set</button>
         </div>
-        <textarea class="segment-text" rows="3" spellcheck="true"></textarea>
+        <textarea class="segment-text" rows="1" spellcheck="true"></textarea>
       </article>
     </template>
 

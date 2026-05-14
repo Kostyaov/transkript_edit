@@ -39,6 +39,7 @@ TurboScribe CSV exports `start` and `end` in milliseconds. Internally this app s
 - Speaker-specific row background colors.
 - Stronger active-row highlight during playback.
 - Audio player with playback-rate control.
+- Toggle timing controls on/off to give the text editor more horizontal space.
 - Click `Play` on a segment to start audio from that segment.
 - Active segment follows `audio.currentTime`.
 - Textareas auto-expand so each text block is visible.

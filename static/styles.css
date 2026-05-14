@@ -224,6 +224,21 @@ audio {
   text-transform: uppercase;
 }
 
+.tool-block .toggle-row {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  font-size: 0.95rem;
+  gap: 10px;
+  text-transform: none;
+}
+
+.toggle-row input {
+  accent-color: var(--accent);
+  height: 18px;
+  width: 18px;
+}
+
 input[type="search"],
 input[type="text"],
 select,
@@ -318,9 +333,17 @@ button:focus-visible {
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 64px 150px 220px minmax(0, 1fr);
+  grid-template-columns: 42px 150px 220px minmax(0, 1fr);
   min-width: 0;
   padding: 8px;
+}
+
+.segments-list.timing-hidden .segment-row {
+  grid-template-columns: 42px 150px minmax(0, 1fr);
+}
+
+.segments-list.timing-hidden .time-controls {
+  display: none;
 }
 
 .segment-row.has-speaker {
@@ -342,10 +365,49 @@ button:focus-visible {
 }
 
 .play-segment {
-  width: 100%;
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0;
+  width: 42px;
 }
 
-.speaker-control label,
+.play-segment::before {
+  border-bottom: 8px solid transparent;
+  border-left: 12px solid var(--accent);
+  border-top: 8px solid transparent;
+  content: "";
+  margin-left: 3px;
+}
+
+.play-segment:hover:not(:disabled)::before {
+  border-left-color: var(--accent-strong);
+}
+
+.segment-row.playing .play-segment::before {
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 4px,
+    transparent 4px 8px,
+    var(--accent) 8px 12px
+  );
+  border: 0;
+  height: 16px;
+  margin-left: 0;
+  width: 12px;
+}
+
+.segment-row.playing .play-segment:hover:not(:disabled)::before {
+  background: linear-gradient(
+    to right,
+    var(--accent-strong) 0 4px,
+    transparent 4px 8px,
+    var(--accent-strong) 8px 12px
+  );
+}
+
+.speaker-control,
 .time-controls {
   display: grid;
   gap: 8px;
@@ -355,16 +417,11 @@ button:focus-visible {
   grid-template-columns: minmax(0, 1fr) 52px;
 }
 
-.speaker-control label {
-  gap: 4px;
-}
-
 .time-controls label {
   display: grid;
   gap: 4px;
 }
 
-.speaker-control span,
 .time-controls span {
   color: var(--muted);
   font-size: 0.72rem;
@@ -372,13 +429,15 @@ button:focus-visible {
   text-transform: uppercase;
 }
 
-.speaker-control input,
+.speaker-control select,
 .time-controls input {
   font-variant-numeric: tabular-nums;
 }
 
 .segment-text {
-  min-height: 52px;
+  line-height: 1.35;
+  min-height: 40px;
+  padding: 8px 10px;
 }
 
 @media (max-width: 1000px) {
