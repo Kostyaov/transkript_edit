@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline Transcript Editor</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="kicker">Offline editor</p>
+          <h1>Transcript Sync Desk</h1>
+        </div>
+        <div class="topbar-actions">
+          <button id="newProjectButton" class="ghost-button" type="button">New</button>
+          <button id="saveButton" class="primary-button" type="button" disabled>Save</button>
+        </div>
+      </header>
+
+      <section id="importPanel" class="import-panel">
+        <div class="field-grid">
+          <label class="file-field">
+            <span>Audio</span>
+            <input id="audioInput" type="file" accept="audio/*,video/mp4,video/quicktime" />
+          </label>
+          <label class="file-field">
+            <span>Transcript</span>
+            <input id="transcriptInput" type="file" accept=".csv,.srt,.vtt,.txt,.json,text/csv,text/plain,text/vtt,application/json" />
+          </label>
+          <button id="createButton" class="primary-button" type="button">Load editor</button>
+        </div>
+        <div id="recentPanel" class="recent-panel hidden">
+          <label for="recentProjects">Recent projects</label>
+          <select id="recentProjects"></select>
+          <button id="openRecentButton" type="button">Open</button>
+        </div>
+        <p id="importStatus" class="status-line"></p>
+      </section>
+
+      <section id="editorPanel" class="editor-panel hidden">
+        <aside class="side-panel">
+          <audio id="audioPlayer" controls preload="metadata"></audio>
+
+          <div class="tool-block">
+            <label for="searchInput">Search</label>
+            <input id="searchInput" type="search" placeholder="Find text" />
+          </div>
+
+          <div class="tool-block">
+            <label for="rateInput">Speed</label>
+            <input id="rateInput" type="range" min="0.5" max="1.5" value="1" step="0.05" />
+            <output id="rateOutput">1.00x</output>
+          </div>
+
+          <div class="tool-block">
+            <span class="block-label">Current time</span>
+            <div id="currentTime" class="time-readout">00:00:00,000</div>
+          </div>
+
+          <div class="export-grid">
+            <button data-export="srt" type="button">SRT</button>
+            <button data-export="vtt" type="button">VTT</button>
+            <button data-export="csv" type="button">CSV</button>
+            <button data-export="txt" type="button">TXT</button>
+            <button data-export="json" type="button">JSON</button>
+          </div>
+        </aside>
+
+        <section class="transcript-pane">
+          <div class="pane-toolbar">
+            <div>
+              <p id="projectName" class="project-name"></p>
+              <p id="segmentCount" class="muted"></p>
+              <p id="editorStatus" class="muted"></p>
+            </div>
+            <div class="toolbar-actions">
+              <button id="prevSegmentButton" type="button" disabled>Previous</button>
+              <button id="nextSegmentButton" type="button" disabled>Next</button>
+              <button id="addSegmentButton" type="button">Add segment</button>
+              <button id="mergeButton" type="button" disabled>Merge next</button>
+              <button id="splitButton" type="button" disabled>Split text</button>
+            </div>
+          </div>
+          <div id="segmentsList" class="segments-list" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+
+    <template id="segmentTemplate">
+      <article class="segment-row">
+        <button class="play-segment" type="button" title="Play from this segment">Play</button>
+        <div class="speaker-control">
+          <label>
+            <span>Speaker</span>
+            <select class="speaker-input"></select>
+          </label>
+        </div>
+        <div class="time-controls">
+          <label>
+            <span>Start</span>
+            <input class="start-input" type="text" inputmode="decimal" />
+          </label>
+          <button class="set-start" type="button">Set</button>
+          <label>
+            <span>End</span>
+            <input class="end-input" type="text" inputmode="decimal" />
+          </label>
+          <button class="set-end" type="button">Set</button>
+        </div>
+        <textarea class="segment-text" rows="3" spellcheck="true"></textarea>
+      </article>
+    </template>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
