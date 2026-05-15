@@ -79,12 +79,34 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-document.addEventListener("keydown", (event) => {
-  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") return;
-  event.preventDefault();
-  if (!state.project || nodes.saveButton.disabled) return;
-  saveProject();
-});
+document.addEventListener("keydown", handleGlobalKeydown);
+
+function handleGlobalKeydown(event) {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    if (!state.project || nodes.saveButton.disabled) return;
+    saveProject();
+    return;
+  }
+
+  if (!state.project || isEditingControl(event.target)) return;
+
+  if (event.key === " ") {
+    event.preventDefault();
+    toggleCurrentSegmentPlayback();
+    return;
+  }
+
+  if (!event.metaKey && !event.ctrlKey && !event.altKey && /^[0-9]$/.test(event.key)) {
+    event.preventDefault();
+    assignSpeakerByShortcut(Number(event.key));
+  }
+}
+
+function isEditingControl(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  return ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName) || target.isContentEditable;
+}
 
 async function createProject() {
   const audioFile = nodes.audioInput.files?.[0];
@@ -208,13 +230,14 @@ function renderSegments() {
   nodes.segmentsList.textContent = "";
   nodes.segmentsList.classList.toggle("timing-hidden", !state.showTiming);
   const speakers = getSpeakers();
+  const highlightedId = highlightedSegmentId();
   syncSpeakerColors(speakers);
   const fragment = document.createDocumentFragment();
   for (const segment of state.segments) {
     const row = nodes.segmentTemplate.content.firstElementChild.cloneNode(true);
     row.dataset.id = String(segment.id);
     applySpeakerColor(row, segment.speaker);
-    row.classList.toggle("selected", segment.id === state.selectedId);
+    row.classList.toggle("selected", segment.id === highlightedId);
     row.classList.toggle("active", segment.id === state.activeId);
     row.classList.toggle("playing", isSegmentPlaying(segment.id));
     populateSpeakerSelect(row.querySelector(".speaker-input"), speakers, segment.speaker);
@@ -318,17 +341,21 @@ function applySpeakerColor(row, speaker) {
 
 function selectSegment(id) {
   state.selectedId = id;
-  document.querySelectorAll(".segment-row").forEach((row) => {
-    row.classList.toggle("selected", Number(row.dataset.id) === id);
-  });
+  updateSelectedRows();
   updateToolbar();
 }
 
 function handleTextKeydown(event, id) {
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
     event.preventDefault();
+    insertTextareaLineBreak(event.currentTarget, id);
+    return;
+  }
+  if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Enter") {
+    event.preventDefault();
     selectSegment(id);
-    goToAdjacentSegment(1, true);
+    event.currentTarget.blur();
+    return;
   }
   if ((event.metaKey || event.ctrlKey) && event.key === "ArrowDown") {
     event.preventDefault();
@@ -340,6 +367,16 @@ function handleTextKeydown(event, id) {
     selectSegment(id);
     goToAdjacentSegment(-1, false);
   }
+}
+
+function insertTextareaLineBreak(textarea, id) {
+  const start = textarea.selectionStart ?? textarea.value.length;
+  const end = textarea.selectionEnd ?? start;
+  const nextValue = `${textarea.value.slice(0, start)}\n${textarea.value.slice(end)}`;
+  textarea.value = nextValue;
+  textarea.setSelectionRange(start + 1, start + 1);
+  updateSegment(id, { text: nextValue }, false);
+  fitTextarea(textarea);
 }
 
 function updateSegment(id, patch, rerender = true) {
@@ -470,6 +507,61 @@ function toggleSegmentPlayback(segment) {
   playFrom(segment.start, segment.id);
 }
 
+function toggleCurrentSegmentPlayback() {
+  if (!nodes.audioPlayer.paused) {
+    nodes.audioPlayer.pause();
+    clearPlayingSegment();
+    return;
+  }
+  if (nodes.audioPlayer.currentTime > 0) {
+    resumeFromCurrentTime();
+    return;
+  }
+  const segment = currentShortcutSegment();
+  if (segment) {
+    toggleSegmentPlayback(segment);
+  }
+}
+
+function currentShortcutSegment() {
+  const id = highlightedSegmentId() ?? state.selectedId ?? state.activeId;
+  return state.segments.find((segment) => segment.id === id) || state.segments[0] || null;
+}
+
+function currentTimeSegment() {
+  const time = nodes.audioPlayer.currentTime || 0;
+  return state.segments.find((segment) => time >= segment.start && time <= segment.end) || null;
+}
+
+function resumeFromCurrentTime() {
+  const segment = currentTimeSegment() || currentShortcutSegment();
+  if (segment) {
+    state.playingSegmentId = segment.id;
+    state.selectedId = segment.id;
+    centerSegmentInView(segment.id);
+    updatePlaybackControls();
+  }
+  const playPromise = nodes.audioPlayer.play();
+  if (playPromise?.catch) {
+    playPromise.catch(() => {
+      clearPlayingSegment();
+      setStatus("Could not resume playback.");
+    });
+  }
+}
+
+function assignSpeakerByShortcut(index) {
+  const segment = currentShortcutSegment();
+  if (!segment) return;
+  const speakers = getSpeakers();
+  const speaker = index === 0 ? "" : speakers[index - 1];
+  if (speaker === undefined) return;
+  state.selectedId = segment.id;
+  updateSegment(segment.id, { speaker }, false);
+  renderSegments();
+  centerSegmentInView(segment.id);
+}
+
 function playFrom(seconds, segmentId = null) {
   nodes.audioPlayer.currentTime = Math.max(0, seconds);
   if (segmentId !== null) {
@@ -506,10 +598,21 @@ function syncActiveSegment() {
   nodes.currentTime.textContent = formatTime(time);
   const active = state.segments.find((segment) => time >= segment.start && time <= segment.end);
   const activeId = active?.id ?? null;
+  const previousSelectedId = state.selectedId;
   if (!nodes.audioPlayer.paused) {
     state.playingSegmentId = activeId;
+    if (activeId !== null) {
+      state.selectedId = activeId;
+    }
   }
-  if (activeId === state.activeId) return;
+  if (activeId === state.activeId) {
+    if (previousSelectedId !== state.selectedId) {
+      updateSelectedRows();
+      updateToolbar();
+    }
+    updatePlaybackControls();
+    return;
+  }
   state.activeId = activeId;
   document.querySelectorAll(".segment-row").forEach((row) => {
     const isActive = Number(row.dataset.id) === activeId;
@@ -521,12 +624,29 @@ function syncActiveSegment() {
       row.scrollIntoView({ block: "nearest" });
     }
   });
+  updateSelectedRows();
+  updateToolbar();
   updatePlaybackControls();
 }
 
 function clearPlayingSegment() {
   state.playingSegmentId = null;
+  updateSelectedRows();
   updatePlaybackControls();
+}
+
+function highlightedSegmentId() {
+  if (!nodes.audioPlayer.paused && state.activeId !== null) {
+    return state.activeId;
+  }
+  return state.selectedId;
+}
+
+function updateSelectedRows() {
+  const highlightedId = highlightedSegmentId();
+  document.querySelectorAll(".segment-row").forEach((row) => {
+    row.classList.toggle("selected", Number(row.dataset.id) === highlightedId);
+  });
 }
 
 function isSegmentPlaying(id) {

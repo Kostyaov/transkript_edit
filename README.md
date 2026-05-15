@@ -48,7 +48,8 @@ TurboScribe CSV exports `start` and `end` in milliseconds. Internally this app s
 - Split text at caret; focus moves to the newly split text.
 - Merge selected segment with next segment.
 - Previous/Next segment navigation.
-- `Cmd+Enter` / `Ctrl+Enter` in a text field moves to the next segment and plays it.
+- Listening mode shortcuts: `Space` pauses/resumes audio from the current position; `0-9` assigns speaker by dropdown order.
+- Text editing mode shortcuts: `Enter` exits editing; `Cmd+Enter` / `Ctrl+Enter` inserts a new line.
 - `Cmd+S` / `Ctrl+S` saves the local project state.
 - Recent projects list.
 - Export as CSV, TXT, SRT, VTT, JSON.
