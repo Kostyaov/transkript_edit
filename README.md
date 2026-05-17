@@ -396,9 +396,42 @@ Not in scope right now:
 
 ## Running Locally
 
-Install dependencies if needed:
+The app is a local Python web server plus static frontend. It does not need a cloud account or external API. Audio files and edited projects are stored on the same machine in `data/projects/`.
+
+Recommended prerequisites:
+
+- Python 3.11 or newer. Python 3.12 was used during development.
+- Git, if cloning from GitHub.
+- A modern browser: Chrome, Edge, Firefox, or Safari.
+
+Clone the repository:
 
 ```bash
+git clone https://github.com/Kostyaov/transkript_edit.git
+cd transkript_edit
+```
+
+If you downloaded the repository as a ZIP instead, unzip it and open a terminal in the extracted `transkript_edit` folder.
+
+### macOS
+
+Check Python:
+
+```bash
+python3 --version
+```
+
+Create and activate a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
 ```
 
@@ -414,7 +447,102 @@ Open:
 http://127.0.0.1:8001/
 ```
 
-The development session has been using port `8001` because port `8000` was already occupied by another local app.
+### Windows
+
+Check Python in PowerShell:
+
+```powershell
+py --version
+```
+
+Create and activate a virtual environment:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks activation scripts, run this once for the current terminal session and activate again:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```powershell
+py -m pip install --upgrade pip
+py -m pip install -r requirements.txt
+```
+
+Run:
+
+```powershell
+py -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+```
+
+Open:
+
+```text
+http://127.0.0.1:8001/
+```
+
+Windows keyboard note: shortcuts that use `Cmd` on macOS use `Ctrl` on Windows, for example `Ctrl+S` and `Ctrl+Enter`.
+
+### Linux
+
+Check Python:
+
+```bash
+python3 --version
+```
+
+Create and activate a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+If `venv` is missing on Debian/Ubuntu, install it first:
+
+```bash
+sudo apt install python3-venv
+```
+
+Install dependencies:
+
+```bash
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
+```
+
+Run:
+
+```bash
+python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+```
+
+Open:
+
+```text
+http://127.0.0.1:8001/
+```
+
+### Port Notes
+
+The development session has been using port `8001` because port `8000` was already occupied by another local app. If `8001` is busy on your machine, choose another port:
+
+```bash
+python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8002
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8002/
+```
 
 ## Verification Commands
 
